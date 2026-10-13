@@ -1,11 +1,13 @@
 import math
+import operator
 import tkinter as tk
 from tkinter import messagebox
 from typing import Any
+import textwrap
 from screeninfo import get_monitors
 from PIL import Image, ImageTk
 
-#region Variables + Functions
+#region Variables
 repairs = [ {"device": "GameBoy", "cost": 45, "time": 30, "success": True},
             {"device": "PS2", "cost": 80, "time": 60, "success": True},
             {"device": "iPod", "cost": 30, "time": 20, "success": False},
@@ -15,13 +17,22 @@ repairs = [ {"device": "GameBoy", "cost": 45, "time": 30, "success": True},
 #endregion
 
 #region Window Configuration
-def get_image():
-    image = Image.open("revenue_image.png")
-    image = image.resize((500,600), Image.Resampling.LANCZOS)
-    #need to adjust the image 
-    image = ImageTk.PhotoImage(image)
-    return image
-
+def get_images(number: int):
+    if number == 0:
+        image = Image.open("dead_image.png")
+        image = image.resize((320,400), Image.Resampling.LANCZOS) #width x height
+        image = ImageTk.PhotoImage(image)
+        return image
+    elif number == 1:
+        image = Image.open("plug_image.png")
+        image = image.resize((110, 160), Image.Resampling.LANCZOS)  # width x height
+        image = ImageTk.PhotoImage(image)
+        return image
+    else:
+        image = Image.open("revenue_image.png")
+        image = image.resize((320, 400), Image.Resampling.LANCZOS)  # width x height
+        image = ImageTk.PhotoImage(image)
+        return image
 
 def center_on_monitor(root, monitor_index=1, width=500, height=500)->None:
     monitors = get_monitors()
@@ -55,10 +66,10 @@ class App:
 
         self.math_engine = math_engine
         self.data_state = {}
-        self.devices_frame_here = True
         self.math_frame_here = True
+        self.devices_frame_here = False
 
-        self.image = get_image()
+        self.images = [get_images(n) for n in range(3)]
         self._build_ui()
 
     def _build_ui(self):
@@ -87,15 +98,21 @@ class App:
         self.ghost_button = tk.Button(self.header_frame_left, text="★", command=self.hide_devices_frame, font=("Arial", 20, "bold"), bg="#2c3e50", fg="red", pady=1, highlightthickness=2, highlightbackground="black", highlightcolor="black")
         self.ghost_button.pack_forget()
 
-        self.body_frame_left = tk.Frame(self.left_frame, bd=8, bg="#2c3e50", relief="ridge")
-        self.body_frame_left.pack_forget()
+        self.body_frame_left_buttons = tk.Frame(self.left_frame, bd=8, bg="#2c3e50", relief="ridge")
+        self.body_frame_left_buttons.pack_forget()
 
-        self.placeholder_picture = tk.Canvas(self.left_frame, width=300, height=600, highlightthickness=0, bg="#1e2435")
-        self.placeholder_picture.pack(side="left", fill="both", expand=True)
-        self.placeholder_picture.create_image(0, 0, image=self.image, anchor="nw")
+        self.body_frame_left_pictures = tk.Frame(self.left_frame, bd=8, bg="#2c3e50", relief="ridge")
+        self.body_frame_left_pictures.pack(side="left", fill="both", expand=True)
+
+        self.dead_picture = tk.Canvas(self.body_frame_left_pictures, width=250, height=600, highlightthickness=0, bg="#1e2435")
+        self.dead_picture.pack(side="left", fill="both", expand=True)
+        self.dead_picture.create_image(0, 0, image=self.images[0], anchor="nw")
+
+        self.alive_picture = tk.Canvas(self.body_frame_left_pictures, width=250, height=600, highlightthickness=0, bg="#1e2435")
+        self.alive_picture.pack_forget()
+        self.alive_picture.create_image(0, 0, image=self.images[2], anchor="nw")
 
         self.ghost_device_buttons = []
-
         #endregion
 
         #region Right_frame widgets
@@ -104,6 +121,9 @@ class App:
 
         self.math_frame = tk.Frame(self.right_frame, bd=8, relief="ridge", bg="#2c3e40")
         self.math_frame.place(relx=0, rely=0.12, relheight=0.385, relwidth=1)
+
+        self.cord_picture_frame = tk.Frame(self.right_frame, bd=8, relief="ridge", bg="#2c3e40")
+        self.cord_picture_frame.place_forget()
 
         self.display_frame = tk.Frame(self.right_frame, bd=8, relief="sunken", bg="#2c3e00")
         self.display_frame.place(relx=0, rely=0.515, relheight=0.245, relwidth=1)
@@ -115,7 +135,12 @@ class App:
         symbol_button = tk.Button(self.header_frame_right, text="★", command = self.toggle_math_frame, font=("Arial", 20, "bold"), bg="#2c3e50", fg="red", bd=3, relief="ridge", pady=1, highlightthickness=2, highlightbackground="black", highlightcolor="black")
         symbol_button.pack(fill="both", expand=True)
 
-        #math_frame widgets
+        # cord_picture_frame widget
+        self.cord_picture = tk.Canvas(self.cord_picture_frame, width=114, height=176, highlightthickness=0, bg="#1e2435")
+        self.cord_picture.pack(side="left", fill="both", expand=True)
+        self.cord_picture.create_image(0, 0, image=self.images[1], anchor="nw")
+
+        # math_frame widgets
         cost_button = tk.Button(self.math_frame, text="Show cost", command=self.show_cost, font=("Arial", 17, "bold"), bd=1, highlightthickness=2, highlightbackground="black", highlightcolor="black", pady=2)
         cost_button.pack(side="top", fill="x", expand=False, pady=(0, 4))
 
@@ -144,7 +169,6 @@ class App:
     #region Callback functions
 
     def initiate_devices_frame(self) -> None:
-
         self.toggle_button.config(state="disabled") #just in case
         self.toggle_button.pack_forget()
 
@@ -155,23 +179,22 @@ class App:
         self.description.config(text="Available Devices: ")
         self.description.pack(side="left", anchor="n", padx=1, pady=1)
 
-        if self.devices_frame_here:
+        if not self.devices_frame_here:
             self.activate_devices_frame()
         else:
             pass
 
     def activate_devices_frame(self) -> None:
+        self.body_frame_left_pictures.pack_forget()
+        self.body_frame_left_buttons.pack(side="left", fill="both", expand=True)
+        self.configure_result_label()
 
-        self.placeholder_picture.pack_forget()
-        self.body_frame_left.pack(side="left", fill="both", expand=True)
-
-        self.devices_frame_here = False
+        self.devices_frame_here = True
 
         device_data: dict[int, dict[str, Any]] = self.math_engine.get_devices()
 
-
         for repair_id, repair in device_data.items():
-            temp = tk.Button(self.body_frame_left, text=repair["device"], pady=2, bd=1, font=("Arial", 16), highlightthickness=2, highlightbackground="black")
+            temp = tk.Button(self.body_frame_left_buttons, text=repair["device"], pady=2, bd=1, font=("Arial", 16), highlightthickness=2, highlightbackground="black")
             temp.pack(side="top", fill="x", anchor="n", padx=3, pady=3)
             temp.config(command= lambda x=repair_id, y=repair, z=temp: self.insert_data(x,y,z))
             self.ghost_device_buttons.append(temp)
@@ -195,20 +218,33 @@ class App:
         self.toggle_button.pack(side="left", anchor="n", padx=5, pady=1, fill="x", expand=True)
         for button in self.ghost_device_buttons:
             button.destroy()
-        self.devices_frame_here = True
-        self.body_frame_left.pack_forget()
         self.data_state = {}
-        self.placeholder_picture.pack(side="left", fill="both", expand=True)
+        self.body_frame_left_buttons.pack_forget()
+        self.body_frame_left_pictures.pack(side="left", fill="both", expand=True)
+        self.devices_frame_here = False
+        self.configure_result_label()
 
     def toggle_math_frame(self) -> None:
         if self.math_frame_here:
             self.math_frame.place_forget()
             self.math_frame_here = False
+            self.cord_picture_frame.place(relx=0, rely=0.12, relwidth=1, relheight=0.385)
+
+            self.dead_picture.pack_forget()
+            self.alive_picture.pack(side="left", fill="both", expand=True)
+            self.cord_picture_frame.update_idletasks()
+            self.configure_result_label()
         else:
+
+            self.alive_picture.pack_forget()
+            self.dead_picture.pack(side="left", fill="both", expand=True)
+
+            self.cord_picture_frame.place_forget()
             self.math_frame.place(relx=0, rely=0.12, relwidth=1, relheight=0.385)
             self.math_frame_here = True
             self.math_frame.lift()
             self.math_frame.update_idletasks()  #Process all pending idle tasks right now.
+            self.configure_result_label()
 
     def show_cost(self) -> None:
         result = self.math_engine.calculate_total_cost(self.data_state)
@@ -235,8 +271,19 @@ class App:
         if result == ("None", 0):
             self.result_label.config(text=" Device did \nnot sell", font=("Arial", 20))
         else:
-            self.result_label.config(text=f"{str(result[0])} \nwith {str(result[1])}$", font=("Arial", 17))
+            device_name = textwrap.fill(result[0], width=10)
+            self.result_label.config(text=f"{str(device_name)} \nwith {str(result[1])}$", font=("Arial", 17))
 
+    def configure_result_label(self) -> None:
+        show_text = (self.body_frame_left_pictures.winfo_manager() == "pack" and
+                     self.alive_picture.winfo_manager() == "pack" and
+                     self.cord_picture_frame.winfo_manager() == "place")
+
+        if show_text:
+            text_for_label = textwrap.fill("Kids these days ..", width=8)
+            self.result_label.config(text=text_for_label, font=("Arial", 24, "bold"))
+        else:
+            self.result_label.config(text="", font=("Arial", 30, "bold"))
     #endregion
 
 class Math:
